@@ -27,32 +27,32 @@ export interface SceneAudioConfig {
 
 // Frequency map for object sound cues — subtle, non-fatiguing tones
 const SOUND_CUE_FREQUENCIES: Record<SoundCue, { freq: number; type: OscillatorType }> = {
-  table:     { freq: 220,  type: 'sine' },
-  window:    { freq: 330,  type: 'sine' },
-  appliance: { freq: 165,  type: 'triangle' },
-  furniture: { freq: 196,  type: 'sine' },
-  door:      { freq: 147,  type: 'square' },
-  generic:   { freq: 262,  type: 'sine' },
+  table: { freq: 220, type: 'sine' },
+  window: { freq: 330, type: 'sine' },
+  appliance: { freq: 165, type: 'triangle' },
+  furniture: { freq: 196, type: 'sine' },
+  door: { freq: 147, type: 'square' },
+  generic: { freq: 262, type: 'sine' },
 };
 
 // Ambient frequencies per room type
 const AMBIENT_FREQUENCIES: Record<AmbientTone, { freq: number; type: OscillatorType; gain: number }> = {
-  kitchen:     { freq: 120, type: 'sine',     gain: 0.015 },
-  living_room: { freq: 80,  type: 'sine',     gain: 0.010 },
-  outdoor:     { freq: 55,  type: 'triangle', gain: 0.012 },
-  office:      { freq: 100, type: 'sine',     gain: 0.010 },
-  bedroom:     { freq: 65,  type: 'sine',     gain: 0.008 },
-  generic:     { freq: 90,  type: 'sine',     gain: 0.010 },
+  kitchen: { freq: 120, type: 'sine', gain: 0.015 },
+  living_room: { freq: 80, type: 'sine', gain: 0.010 },
+  outdoor: { freq: 55, type: 'triangle', gain: 0.012 },
+  office: { freq: 100, type: 'sine', gain: 0.010 },
+  bedroom: { freq: 65, type: 'sine', gain: 0.008 },
+  generic: { freq: 90, type: 'sine', gain: 0.010 },
 };
 
 // Footstep sound parameters per floor material
 const FOOTSTEP_PARAMS: Record<FloorMaterial, { freq: number; type: OscillatorType; duration: number; gain: number }> = {
-  wood:     { freq: 180, type: 'triangle', duration: 0.08, gain: 0.06 },
-  tile:     { freq: 250, type: 'square',   duration: 0.05, gain: 0.05 },
-  carpet:   { freq: 100, type: 'sine',     duration: 0.12, gain: 0.03 },
-  concrete: { freq: 200, type: 'square',   duration: 0.06, gain: 0.06 },
-  grass:    { freq: 80,  type: 'sine',     duration: 0.15, gain: 0.025 },
-  other:    { freq: 150, type: 'triangle', duration: 0.08, gain: 0.04 },
+  wood: { freq: 180, type: 'triangle', duration: 0.08, gain: 0.06 },
+  tile: { freq: 250, type: 'square', duration: 0.05, gain: 0.05 },
+  carpet: { freq: 100, type: 'sine', duration: 0.12, gain: 0.03 },
+  concrete: { freq: 200, type: 'square', duration: 0.06, gain: 0.06 },
+  grass: { freq: 80, type: 'sine', duration: 0.15, gain: 0.025 },
+  other: { freq: 150, type: 'triangle', duration: 0.08, gain: 0.04 },
 };
 
 interface ObjectAudioNode {
@@ -211,6 +211,31 @@ export class AudioEngine {
     oscillator.start(now);
     oscillator.stop(now + params.duration + 0.01);
   }
+  /**
+   * Trigger a short directional turn-tick sound. Non-spatial (plays at listener position).
+   * Used for rotation (turn left/right) to distinguish from footstep taps (forward/backward).
+   */
+  triggerTurnTick(): void {
+    if (!this.audioContext) return;
+
+    const now = this.audioContext.currentTime;
+    const duration = 0.035;
+
+    const oscillator = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+
+    oscillator.frequency.value = 900;
+    oscillator.type = 'square';
+
+    // Very fast attack and decay — a crisp "click", shorter and higher-pitched than a footstep
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    oscillator.connect(gain);
+    gain.connect(this.audioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.01);
+  }
 
   /**
    * Play a short directional ping from a specific position (e.g., when user asks "where is X").
@@ -231,7 +256,7 @@ export class AudioEngine {
    */
   cleanup(): void {
     if (this.ambientOscillator) {
-      try { this.ambientOscillator.stop(); } catch {}
+      try { this.ambientOscillator.stop(); } catch { }
       this.ambientOscillator.disconnect();
       this.ambientOscillator = null;
     }
@@ -241,7 +266,7 @@ export class AudioEngine {
     }
 
     this.objectNodes.forEach(({ oscillator, gain, panner }) => {
-      try { oscillator.stop(); } catch {}
+      try { oscillator.stop(); } catch { }
       oscillator.disconnect();
       gain.disconnect();
       panner.disconnect();

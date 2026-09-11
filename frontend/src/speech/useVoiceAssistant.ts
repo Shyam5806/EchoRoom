@@ -517,7 +517,7 @@ export function useVoiceAssistant({
               if (!isCancelled && isEnabledRef.current && assistantStateRef.current !== 'generating') {
                 try {
                   recognition.start();
-                } catch {}
+                } catch { }
               }
             }, 200);
           }
@@ -536,7 +536,7 @@ export function useVoiceAssistant({
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
-        } catch {}
+        } catch { }
       }
     };
   }, []);
@@ -556,7 +556,7 @@ export function useVoiceAssistant({
     if (mode !== 'generating' && isEnabledRef.current && recognitionRef.current) {
       try {
         recognitionRef.current.start();
-      } catch {}
+      } catch { }
     }
   }, [mode]);
 
@@ -572,7 +572,7 @@ export function useVoiceAssistant({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
-      } catch {}
+      } catch { }
     }
   }, []);
 
@@ -592,7 +592,7 @@ export function useVoiceAssistant({
       const next = !prev;
       if (!next) {
         if (recognitionRef.current) {
-          try { recognitionRef.current.abort(); } catch {}
+          try { recognitionRef.current.abort(); } catch { }
         }
         setAssistantState('idle');
         announce('Voice assistant deactivated.');
@@ -603,7 +603,7 @@ export function useVoiceAssistant({
           setAssistantState('standby');
         }
         announce('Voice assistant activated.');
-        try { recognitionRef.current?.start(); } catch {}
+        try { recognitionRef.current?.start(); } catch { }
       }
       return next;
     });

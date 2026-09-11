@@ -102,11 +102,15 @@ function AppInner() {
 
   const handleTurnLeft = useCallback(() => {
     dispatch({ type: 'TURN_LEFT' });
-  }, [dispatch]);
+    const audio = getAudio();
+    audio.triggerTurnTick();
+  }, [dispatch, getAudio]);
 
   const handleTurnRight = useCallback(() => {
     dispatch({ type: 'TURN_RIGHT' });
-  }, [dispatch]);
+    const audio = getAudio();
+    audio.triggerTurnTick();
+  }, [dispatch, getAudio]);
 
   // Sync audio listener with state changes
   useEffect(() => {
