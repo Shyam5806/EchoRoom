@@ -24,7 +24,7 @@ export const sceneSchema = z.object({
 });
 
 export async function generateScene(description: string): Promise<GenerateSceneResponse> {
-  const response = await fetch('http://localhost:4000/api/generate-scene', {
+  const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-scene`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,8 +49,8 @@ export async function spatialQA(
   listenerFacing: number,
   objectInfos: { label: string; distance: number; relativeDirection: string }[]
 ): Promise<{ answer?: string; error?: string }> {
-  const response = await fetch('http://localhost:4000/api/spatial-qa', {
-    method: 'POST',
+
+  const response = await fetch(`${import.meta.env.VITE_API_URL}/api/spatial-qa`, {    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },

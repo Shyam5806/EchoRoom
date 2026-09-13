@@ -15,7 +15,7 @@ export interface SpatialQARequest {
  */
 export async function spatialQA(request: SpatialQARequest): Promise<{ answer?: string; error?: string }> {
   try {
-    const response = await fetch('http://localhost:4000/api/spatial-qa', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/spatial-qa`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
