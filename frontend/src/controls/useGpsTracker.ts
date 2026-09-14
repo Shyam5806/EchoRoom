@@ -50,6 +50,19 @@ function degreesToCardinal(deg: number): string {
   return `${directions[index]}, ${Math.round(normalized)} degrees`;
 }
 
+// Maximum acceptable GPS accuracy in meters. Readings worse than this are discarded.
+const MAX_ACCEPTABLE_ACCURACY = 20;
+
+// Maximum realistic walking speed in meters/second. Any implied movement faster
+// than this between two readings is treated as a GPS glitch, not real motion.
+const MAX_REALISTIC_SPEED_MPS = 3;
+
+// Minimum displacement (meters) required to register as an actual navigation step.
+const MIN_STEP_DISTANCE = 0.4;
+
+// Distance accumulated (meters) before triggering a footstep audio cue.
+const FOOTSTEP_TRIGGER_DISTANCE = 0.5;
+
 export function useGpsTracker({
   onMovement,
   onHeadingChange,
@@ -64,6 +77,7 @@ export function useGpsTracker({
 
   const watchIdRef = useRef<number | null>(null);
   const lastCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const lastTimestampRef = useRef<number | null>(null);
   const accumulatedStepDistanceRef = useRef<number>(0);
   const lastCompassHeadingRef = useRef<number | null>(null);
 
@@ -89,11 +103,19 @@ export function useGpsTracker({
     speak('Acquiring GPS signal. Please allow location access.');
 
     lastCoordsRef.current = null;
+    lastTimestampRef.current = null;
     accumulatedStepDistanceRef.current = 0;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy, heading, speed } = position.coords;
+        const timestamp = position.timestamp;
+
+        // Reject low-accuracy readings outright — these are the primary cause
+        // of sudden position "jumps" and should never update state at all.
+        if (accuracy > MAX_ACCEPTABLE_ACCURACY) {
+          return;
+        }
 
         setCurrentCoords({
           latitude,
@@ -107,6 +129,7 @@ export function useGpsTracker({
         if (!lastCoordsRef.current) {
           setOriginCoords({ latitude, longitude });
           lastCoordsRef.current = { latitude, longitude };
+          lastTimestampRef.current = timestamp;
           setGpsStatus('active');
           speak(`GPS active. Accuracy within ${Math.round(accuracy)} meters. Movement tracking enabled.`);
           return;
@@ -121,11 +144,18 @@ export function useGpsTracker({
         );
 
         const stepDist = Math.sqrt(dx * dx + dz * dz);
+        const elapsedSec = (timestamp - (lastTimestampRef.current ?? timestamp)) / 1000;
+        const impliedSpeed = elapsedSec > 0 ? stepDist / elapsedSec : 0;
+
+        // Reject jumps implying faster-than-walking speed — these are GPS
+        // glitches (satellite/wifi handoff, multipath reflection indoors), not real motion.
+        const isRealisticMovement = impliedSpeed <= MAX_REALISTIC_SPEED_MPS;
 
         // Filter out GPS jitter if displacement is below accuracy threshold
-        // (require at least 0.4 meters movement to trigger navigation step)
-        if (stepDist >= 0.4) {
+        // (require at least MIN_STEP_DISTANCE meters movement to trigger navigation step)
+        if (stepDist >= MIN_STEP_DISTANCE && isRealisticMovement) {
           lastCoordsRef.current = { latitude, longitude };
+          lastTimestampRef.current = timestamp;
           setTotalDistanceMoved(prev => Math.round((prev + stepDist) * 10) / 10);
 
           // Trigger movement delta
@@ -133,10 +163,16 @@ export function useGpsTracker({
 
           // Accumulate for audio footsteps
           accumulatedStepDistanceRef.current += stepDist;
-          if (accumulatedStepDistanceRef.current >= 0.5) {
+          if (accumulatedStepDistanceRef.current >= FOOTSTEP_TRIGGER_DISTANCE) {
             callbacksRef.current.onStep?.();
             accumulatedStepDistanceRef.current = 0;
           }
+        } else if (stepDist >= MIN_STEP_DISTANCE && !isRealisticMovement) {
+          // Glitch reading: update the timestamp reference so a single bad
+          // sample doesn't inflate the "implied speed" of the *next* reading too,
+          // but deliberately do NOT update lastCoordsRef, so the bad position
+          // is discarded rather than becoming the new baseline.
+          lastTimestampRef.current = timestamp;
         }
 
         // Update heading if available
@@ -273,6 +309,7 @@ export function useGpsTracker({
     if (currentCoords) {
       setOriginCoords({ latitude: currentCoords.latitude, longitude: currentCoords.longitude });
       lastCoordsRef.current = { latitude: currentCoords.latitude, longitude: currentCoords.longitude };
+      lastTimestampRef.current = Date.now();
       setTotalDistanceMoved(0);
       speak('GPS origin reset to your current physical position.');
     } else {
